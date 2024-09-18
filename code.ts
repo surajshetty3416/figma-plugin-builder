@@ -70,6 +70,8 @@ type Block = {
 };
 
 async function convertNode(node: SceneNode): Promise<Block> {
+  // const css = await node.getCSSAsync();
+  // console.log(css);
   const children =
     "children" in node ? await Promise.all(node.children.map(convertNode)) : [];
   const originalElement = isSVG(node) ? "__raw_html__" : "";
@@ -277,12 +279,28 @@ function getBaseStyles(node: SceneNode) {
   }
 
   if (node.type !== "TEXT") {
-    if ("height" in node) {
-      styles.height = `${Math.round(node.height)}px`;
+    if (
+      "layoutMode" in node &&
+      node.layoutMode === "HORIZONTAL" &&
+      "primaryAxisSizingMode" in node &&
+      node.primaryAxisSizingMode === "FIXED"
+    ) {
+      styles.width = `${node.width}px`;
     }
-    if ("width" in node) {
-      styles.width = `${Math.round(node.width)}px`;
+    if (
+      "layoutMode" in node &&
+      node.layoutMode === "VERTICAL" &&
+      "primaryAxisSizingMode" in node &&
+      node.primaryAxisSizingMode === "FIXED"
+    ) {
+      styles.height = `${node.height}px`;
     }
+    // if ("height" in node) {
+    //   styles.height = `${Math.round(node.height)}px`;
+    // }
+    // if ("width" in node) {
+    //   styles.width = `${Math.round(node.width)}px`;
+    // }
   }
 
   if ("cornerRadius" in node) {
