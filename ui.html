@@ -1,24 +1,24 @@
-<!-- show select frame if no frame is selected -->
-<div id="no-frame" style="display: none">
-  <h2>No frame selected</h2>
-  <p>Please select a frame to copy</p>
+
+<div id="no-frame" style="padding: 10px; font-family: Arial, Helvetica, sans-serif; text-align: center;">
+  <h2 style="margin-bottom: 5px;">No frame selected</h2>
+  <p style="margin-top: 5px; color: rgb(100, 100, 100);">Please select a frame to copy</p>
 </div>
 
-<!-- show copy to clipboard button -->
-<div id="copy" style="display: none; place-items: center; height: 100%">
-  <button id="copy-button">Copy to clipboard</button>
+<div id="copy" style="display: none; place-items: center; height: 100%; background: #10101022; color: rgb(100, 100, 100);">
+  <div style="width: 100%; text-align: center;">
+    <button id="copy-button" style="border: none; background: #000; color:white; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: auto;">Copy Frame</button>
+    <p style="margin-top: 10px; font-size: 12px; font-family: Arial, Helvetica, sans-serif;" id="current-selection"></p>
+  </div>
 </div>
 
 <script>
   let dataToCopy = null;
   document.getElementById("copy-button").addEventListener("click", () => {
-    console.log("copying data");
-    parent.postMessage({ pluginMessage: { type: "copy-to-clipboard" } }, "*");
+    parent.postMessage({ pluginMessage: { type: "copy-data" } }, "*");
   });
 
   // Listen for messages from the plugin
   onmessage = async (event) => {
-    console.log(event.data.pluginMessage);
     const { type, message } = event.data.pluginMessage;
     if (type === "no-selection") {
       document.getElementById("no-frame").style.display = "block";
@@ -26,9 +26,9 @@
     } else if (type === "selection") {
       document.getElementById("no-frame").style.display = "none";
       document.getElementById("copy").style.display = "grid";
-    } else if (type === "trigger-copy") {
+      document.getElementById("current-selection").innerText = `${message}`;
+    } else if (type === "copy-to-clipboard") {
       dataToCopy = message;
-      console.log(dataToCopy);
       document.execCommand("copy");
     }
   };

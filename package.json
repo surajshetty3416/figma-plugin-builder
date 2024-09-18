@@ -1,7 +1,7 @@
 {
-  "name": "Frappe-Builder",
+  "name": "frappe-builder",
   "version": "1.0.0",
-  "description": "Your Figma Plugin",
+  "description": "Plugin to copy frames from Figma to Frappe Builder",
   "main": "code.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",

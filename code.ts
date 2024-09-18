@@ -12,18 +12,23 @@ figma.showUI(__html__);
 // Calls to "parent.postMessage" from within the HTML page will trigger this
 // callback. The callback will be passed the "pluginMessage" property of the
 // posted message.
+informSelection();
+
 figma.on("selectionchange", () => {
+  informSelection();
+});
+
+function informSelection() {
   const nodes = figma.currentPage.selection;
   if (nodes.length === 0) {
     figma.ui.postMessage({ type: "no-selection" });
   } else {
-    figma.ui.postMessage({ type: "selection" });
+    figma.ui.postMessage({ type: "selection", message: nodes[0].name });
   }
-});
+}
 
 figma.ui.onmessage = async (msg: { type: string }) => {
-  console.log(msg);
-  if (msg.type === "copy-to-clipboard") {
+  if (msg.type === "copy-data") {
     await convertToJSON();
   }
 };
@@ -36,12 +41,11 @@ async function convertToJSON() {
     const res = await convertPage(page);
     result.push(res);
   }
-  console.log(result);
   figma.ui.postMessage({
-    type: "trigger-copy",
+    type: "copy-to-clipboard",
     message: result,
   });
-  figma.notify("JSON copied to clipboard");
+  figma.notify("Copied to clipboard");
 }
 
 async function convertPage(page: SceneNode): Promise<Block> {
