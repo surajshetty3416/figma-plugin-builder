@@ -1,0 +1,47 @@
+<!-- show select frame if no frame is selected -->
+<div id="no-frame" style="display: none">
+  <h2>No frame selected</h2>
+  <p>Please select a frame to copy</p>
+</div>
+
+<!-- show copy to clipboard button -->
+<div id="copy" style="display: none; place-items: center; height: 100%">
+  <button id="copy-button">Copy to clipboard</button>
+</div>
+
+<script>
+  let dataToCopy = null;
+  document.getElementById("copy-button").addEventListener("click", () => {
+    console.log("copying data");
+    parent.postMessage({ pluginMessage: { type: "copy-to-clipboard" } }, "*");
+  });
+
+  // Listen for messages from the plugin
+  onmessage = async (event) => {
+    console.log(event.data.pluginMessage);
+    const { type, message } = event.data.pluginMessage;
+    if (type === "no-selection") {
+      document.getElementById("no-frame").style.display = "block";
+      document.getElementById("copy").style.display = "none";
+    } else if (type === "selection") {
+      document.getElementById("no-frame").style.display = "none";
+      document.getElementById("copy").style.display = "grid";
+    } else if (type === "trigger-copy") {
+      dataToCopy = message;
+      console.log(dataToCopy);
+      document.execCommand("copy");
+    }
+  };
+
+  const copyToClipboard = (event) => {
+    event.clipboardData.setData(
+      "builder-copied-blocks",
+      JSON.stringify({
+        blocks: dataToCopy,
+        components: [],
+      })
+    );
+    event.preventDefault();
+  };
+  document.addEventListener("copy", copyToClipboard);
+</script>
