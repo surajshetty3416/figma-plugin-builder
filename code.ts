@@ -33,6 +33,49 @@ figma.ui.onmessage = async (msg: { type: string }) => {
   }
 };
 
+const BASE_STYLE_PROPERTIES = [
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "display",
+  "flex-direction",
+  "gap",
+  "justify-content",
+  "align-items",
+  "width",
+  "height",
+  "border-radius",
+  "border-width",
+  "border-color",
+  "background",
+  "color",
+  "font-size",
+  "font-family",
+  "letter-spacing",
+  "line-height",
+  "text-align",
+  "text-decoration",
+  "text-transform",
+  "padding",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "box-shadow",
+  "opacity",
+  "object-fit",
+  "align-self",
+];
+
+// converts border-color to borderColor
+function kebabToCamelCase(str: string) {
+  return str.replace(/-([a-z])/g, function (g) {
+    return g[1].toUpperCase();
+  });
+}
+
 async function convertToJSON() {
   const pages = figma.currentPage.selection;
   const result = [];
@@ -49,7 +92,9 @@ async function convertToJSON() {
 }
 
 async function convertPage(page: SceneNode): Promise<Block> {
-  return convertNode(page);
+  const converted = await convertNode(page);
+  console.log(converted);
+  return converted;
 }
 
 type Block = {
@@ -70,17 +115,22 @@ type Block = {
 };
 
 async function convertNode(node: SceneNode): Promise<Block> {
-  // const css = await node.getCSSAsync();
-  // console.log(css);
   const children =
-    "children" in node ? await Promise.all(node.children.map(convertNode)) : [];
+    "children" in node
+      ? await Promise.all(
+          node.children.filter((child) => child.visible).map(convertNode)
+        )
+      : [];
+
+  const baseStyles = await getBaseStyles(node);
+  const rawStyles = await getRawStyles(node);
 
   const originalElement = isSVG(node) ? "__raw_html__" : "";
   const baseNode = {
     blockId: node.id,
     children: children,
-    baseStyles: getBaseStyles(node),
-    rawStyles: getRawStyles(node),
+    baseStyles: baseStyles,
+    rawStyles: rawStyles,
     originalElement: originalElement,
     mobileStyles: {},
     tabletStyles: {},
@@ -112,6 +162,7 @@ async function convertNode(node: SceneNode): Promise<Block> {
       }
     }
   }
+
   return baseNode;
 }
 
@@ -157,8 +208,39 @@ async function getSVGFromVector(node: SceneNode): Promise<string> {
   }
 }
 
-function getBaseStyles(node: SceneNode) {
+async function getBaseStyles(node: SceneNode) {
   const styles: Record<string, string | number> = {};
+
+  const css = await node.getCSSAsync();
+
+  for (const key of BASE_STYLE_PROPERTIES) {
+    if (key in css) {
+      styles[key] = css[key];
+    }
+  }
+
+  // display none if not visible
+  if ("visible" in node) {
+    styles.display = node.visible ? "flex" : "none";
+  }
+
+  // strip out quotes from font-family value
+  if ("font-family" in styles) {
+    styles["font-family"] = styles["font-family"].replace(/"/g, "");
+  }
+
+  // // overflow hidden
+  // if (node.type === "FRAME" || node.type === "GROUP") {
+  //   styles.overflow = "hidden";
+  // }
+
+  const convertedStyles = {};
+  // convert border-color to borderColor
+  for (const key in styles) {
+    convertedStyles[kebabToCamelCase(key)] = styles[key];
+  }
+
+  return convertedStyles;
 
   if (isSVG(node)) {
     return styles;
@@ -384,8 +466,24 @@ function getBaseStyles(node: SceneNode) {
   return styles;
 }
 
-function getRawStyles(node: SceneNode) {
+async function getRawStyles(node: SceneNode) {
   const styles: Record<string, string | number> = {};
+
+  const css = await node.getCSSAsync();
+
+  for (const key in css) {
+    if (!BASE_STYLE_PROPERTIES.includes(key)) {
+      styles[key] = css[key];
+    }
+  }
+
+  const convertedStyles = {};
+  // convert border-color to borderColor
+  for (const key in styles) {
+    convertedStyles[kebabToCamelCase(key)] = styles[key];
+  }
+
+  return convertedStyles;
 
   // if vector
   if (isSVG(node)) {
