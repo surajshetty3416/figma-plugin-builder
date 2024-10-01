@@ -74,6 +74,7 @@ async function convertNode(node: SceneNode): Promise<Block> {
   // console.log(css);
   const children =
     "children" in node ? await Promise.all(node.children.map(convertNode)) : [];
+
   const originalElement = isSVG(node) ? "__raw_html__" : "";
   const baseNode = {
     blockId: node.id,
@@ -91,10 +92,25 @@ async function convertNode(node: SceneNode): Promise<Block> {
     element: getElementType(node),
     customAttributes: {},
   };
+
   if (node.type === "TEXT") {
     baseNode.innerText = node.characters;
   } else if (baseNode.element === "svg") {
     baseNode.innerHTML = await getSVGFromVector(node);
+  } else if (baseNode.element === "img") {
+    // const paint = frameNode.fills[0];
+    // const image = figma.getImageByHash(paint.imageHash);
+    // const bytes = await image.getBytesAsync();
+    if ("fills" in node && node.fills.length > 0) {
+      const paint = node.fills[0];
+      const image = figma.getImageByHash(paint.imageHash);
+      if (image) {
+        const bytes = await image.getBytesAsync();
+        // Uint8Array to base64
+        const url = `data:image/png;base64,${figma.base64Encode(bytes)}`;
+        baseNode.attributes.src = url;
+      }
+    }
   }
   return baseNode;
 }
@@ -104,20 +120,21 @@ function isSVG(node: SceneNode) {
     node.type === "VECTOR" ||
     node.type === "ELLIPSE" ||
     node.type === "POLYGON" ||
-    node.type === "STAR" ||
-    node.type === "RECTANGLE"
+    node.type === "STAR"
+  );
+}
+
+function isImage(node: SceneNode) {
+  return (
+    node.type === "RECTANGLE" &&
+    node.fills.length > 0 &&
+    node.fills[0].type === "IMAGE"
   );
 }
 
 async function getSVGFromVector(node: SceneNode): Promise<string> {
   // Check if the node is a vector or any node that can be converted to SVG
-  if (
-    node.type === "VECTOR" ||
-    node.type === "ELLIPSE" ||
-    node.type === "POLYGON" ||
-    node.type === "STAR" ||
-    node.type === "RECTANGLE"
-  ) {
+  if (isSVG(node)) {
     try {
       // Export the node as an SVG
       const svgData = await node.exportAsync({
@@ -295,12 +312,14 @@ function getBaseStyles(node: SceneNode) {
     ) {
       styles.height = `${node.height}px`;
     }
-    // if ("height" in node) {
-    //   styles.height = `${Math.round(node.height)}px`;
-    // }
-    // if ("width" in node) {
-    //   styles.width = `${Math.round(node.width)}px`;
-    // }
+    if (isImage(node)) {
+      if ("height" in node) {
+        styles.height = `${Math.round(node.height)}px`;
+      }
+      if ("width" in node) {
+        styles.width = `${Math.round(node.width)}px`;
+      }
+    }
   }
 
   if ("cornerRadius" in node) {
@@ -358,6 +377,10 @@ function getBaseStyles(node: SceneNode) {
     styles.paddingBottom = `${node.paddingBottom}px`;
   }
 
+  if (isImage(node)) {
+    styles.objectFit = getObjectFit(node);
+  }
+
   return styles;
 }
 
@@ -405,6 +428,12 @@ function getRawStyles(node: SceneNode) {
 }
 
 function getElementType(node: SceneNode) {
+  if (isSVG(node)) {
+    return "svg";
+  } else if (isImage(node)) {
+    return "img";
+  }
+
   switch (node.type) {
     case "TEXT":
       return "p";
@@ -414,15 +443,28 @@ function getElementType(node: SceneNode) {
     case "INSTANCE":
     case "COMPONENT":
       return "div";
-    case "VECTOR":
-    case "RECTANGLE":
-    case "ELLIPSE":
-    case "POLYGON":
-      return "svg";
     case "LINE":
       return "hr";
     default:
       return "div";
+  }
+}
+
+function getObjectFit(node: SceneNode) {
+  const fill = node.fills[0];
+  if (fill.type === "IMAGE") {
+    switch (fill.scaleMode) {
+      case "FILL":
+        return "cover";
+      case "FIT":
+        return "contain";
+      case "TILE":
+        return "repeat";
+      default:
+        return "cover";
+    }
+  } else {
+    return "cover";
   }
 }
 
