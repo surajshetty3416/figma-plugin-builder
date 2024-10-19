@@ -7,7 +7,7 @@
 <div id="copy" style="display: none; place-items: center; height: 100%; background: #10101022; color: rgb(100, 100, 100);">
   <div style="width: 100%; text-align: center;">
     <button id="copy-button" style="border: none; background: #000; color:white; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: auto;">Copy Frame</button>
-    <p style="margin-top: 10px; font-size: 12px; font-family: Arial, Helvetica, sans-serif;" id="current-selection"></p>
+    <!-- <p style="margin-top: 10px; font-size: 12px; font-family: Arial, Helvetica, sans-serif;" id="current-selection"></p> -->
   </div>
 </div>
 
@@ -30,6 +30,18 @@
     } else if (type === "copy-to-clipboard") {
       dataToCopy = message;
       document.execCommand("copy");
+    } else if (type === "copying") {
+      document.getElementById("copy-button").innerText = "Copying...";
+      document.getElementById("copy-button").disabled = true;
+      // bg-color: #eee
+      document.getElementById("copy-button").style.backgroundColor = "#aaa";
+    } else if (type === "copied") {
+      document.getElementById("copy-button").innerText = "Copied!";
+      setTimeout(() => {
+        document.getElementById("copy-button").innerText = "Copy Frame";
+        document.getElementById("copy-button").disabled = false;
+        document.getElementById("copy-button").style.backgroundColor = "#000";
+      }, 2000);
     }
   };
 

@@ -27,9 +27,20 @@ function informSelection() {
   }
 }
 
-figma.ui.onmessage = async (msg: { type: string }) => {
+figma.ui.onmessage = (msg: { type: string }) => {
   if (msg.type === "copy-data") {
-    await convertToJSON();
+    figma.notify("Copying...");
+    figma.ui.postMessage({ type: "copying" });
+    setTimeout(() => {
+      convertToJSON().then((result) => {
+        figma.ui.postMessage({
+          type: "copy-to-clipboard",
+          message: result,
+        });
+        figma.ui.postMessage({ type: "copied" });
+        figma.notify("Copied to clipboard!");
+      });
+    }, 100);
   }
 };
 
@@ -67,6 +78,7 @@ const BASE_STYLE_PROPERTIES = [
   "opacity",
   "object-fit",
   "align-self",
+  "font-weight",
 ];
 
 // converts border-color to borderColor
@@ -84,11 +96,7 @@ async function convertToJSON() {
     const res = await convertPage(page);
     result.push(res);
   }
-  figma.ui.postMessage({
-    type: "copy-to-clipboard",
-    message: result,
-  });
-  figma.notify("Copied to clipboard");
+  return result;
 }
 
 async function convertPage(page: SceneNode): Promise<Block> {
@@ -122,8 +130,9 @@ async function convertNode(node: SceneNode): Promise<Block> {
         )
       : [];
 
-  const baseStyles = await getBaseStyles(node);
-  const rawStyles = await getRawStyles(node);
+  const nodeStyles = await node.getCSSAsync();
+  const baseStyles = await getBaseStyles(node, nodeStyles);
+  const rawStyles = await getRawStyles(node, nodeStyles);
 
   const originalElement = isSVG(node) ? "__raw_html__" : "";
   const baseNode = {
@@ -134,7 +143,7 @@ async function convertNode(node: SceneNode): Promise<Block> {
     originalElement: originalElement,
     mobileStyles: {},
     tabletStyles: {},
-    attributes: {},
+    attributes: {} as Record<string, string | number>,
     classes: [],
     innerHTML: "",
     innerText: "",
@@ -151,14 +160,20 @@ async function convertNode(node: SceneNode): Promise<Block> {
     // const paint = frameNode.fills[0];
     // const image = figma.getImageByHash(paint.imageHash);
     // const bytes = await image.getBytesAsync();
-    if ("fills" in node && node.fills.length > 0) {
+    if (
+      "fills" in node &&
+      typeof node.fills === "object" &&
+      node.fills.length > 0
+    ) {
       const paint = node.fills[0];
-      const image = figma.getImageByHash(paint.imageHash);
-      if (image) {
-        const bytes = await image.getBytesAsync();
-        // Uint8Array to base64
-        const url = `data:image/png;base64,${figma.base64Encode(bytes)}`;
-        baseNode.attributes.src = url;
+      if (paint.type === "IMAGE" && paint.imageHash) {
+        const image = figma.getImageByHash(paint.imageHash);
+        if (image) {
+          const bytes = await image.getBytesAsync();
+          // Uint8Array to base64
+          const url = `data:image/png;base64,${figma.base64Encode(bytes)}`;
+          baseNode.attributes.src = url;
+        }
       }
     }
   }
@@ -178,6 +193,7 @@ function isSVG(node: SceneNode) {
 function isImage(node: SceneNode) {
   return (
     node.type === "RECTANGLE" &&
+    typeof node.fills === "object" &&
     node.fills.length > 0 &&
     node.fills[0].type === "IMAGE"
   );
@@ -208,10 +224,8 @@ async function getSVGFromVector(node: SceneNode): Promise<string> {
   }
 }
 
-async function getBaseStyles(node: SceneNode) {
+async function getBaseStyles(node: SceneNode, css: Record<string, string>) {
   const styles: Record<string, string | number> = {};
-
-  const css = await node.getCSSAsync();
 
   for (const key of BASE_STYLE_PROPERTIES) {
     if (key in css) {
@@ -226,303 +240,38 @@ async function getBaseStyles(node: SceneNode) {
 
   // strip out quotes from font-family value
   if ("font-family" in styles) {
-    styles["font-family"] = styles["font-family"].replace(/"/g, "");
+    styles["font-family"] = (styles["font-family"] as string).replace(/"/g, "");
   }
 
-  // // overflow hidden
-  // if (node.type === "FRAME" || node.type === "GROUP") {
-  //   styles.overflow = "hidden";
-  // }
+  // overflow hidden
+  if (node.type === "FRAME" || node.type === "GROUP") {
+    styles.overflowX = "hidden";
+    styles.overflowY = "hidden";
+  }
 
-  const convertedStyles = {};
+  const convertedStyles = {} as Record<string, string | number>;
   // convert border-color to borderColor
   for (const key in styles) {
     convertedStyles[kebabToCamelCase(key)] = styles[key];
   }
 
   return convertedStyles;
-
-  if (isSVG(node)) {
-    return styles;
-  }
-
-  // if auto layout is disabled then set position to relative
-  // if ("layoutMode" in node && node.layoutMode === "NONE") {
-  //   styles.position = "relative";
-  // }
-
-  // if text
-  if (node.type === "TEXT") {
-    if (node.textDecoration === "STRIKETHROUGH") {
-      styles.textDecoration = "line-through";
-    }
-    if (node.textAlignHorizontal === "CENTER") {
-      styles.textAlign = "center";
-    }
-    if (node.textAlignHorizontal === "RIGHT") {
-      styles.textAlign = "right";
-    }
-    if (node.textAlignHorizontal === "JUSTIFIED") {
-      styles.textAlign = "justify";
-    }
-    if (node.textAlignVertical === "CENTER") {
-      styles.alignItems = "center";
-    }
-    if (node.textAlignVertical === "BOTTOM") {
-      styles.alignItems = "flex-end";
-    }
-    if (node.textAlignVertical === "TOP") {
-      styles.alignItems = "flex-start";
-    }
-    if (node.paragraphIndent) {
-      styles.textIndent = `${node.paragraphIndent}px`;
-    }
-    if (node.paragraphSpacing) {
-      styles.lineHeight = `${node.paragraphSpacing}px`;
-    }
-    if (node.fontSize && typeof node.fontSize !== "symbol") {
-      styles.fontSize = `${node.fontSize}px`;
-    }
-    if (node.fontName && typeof node.fontName !== "symbol") {
-      styles.fontFamily = node.fontName.family;
-    }
-    if (node.letterSpacing && typeof node.letterSpacing !== "symbol") {
-      if (typeof node.letterSpacing === "object") {
-        if (node.letterSpacing.unit === "PIXELS") {
-          styles.letterSpacing = `${node.letterSpacing.value}px`;
-        } else if (node.letterSpacing.unit === "PERCENT") {
-          styles.letterSpacing = `${node.letterSpacing.value}%`;
-        }
-      } else {
-        styles.letterSpacing = `${node.letterSpacing}px`;
-      }
-    }
-    if (node.lineHeight && typeof node.lineHeight !== "symbol") {
-      // if node.lineHeight is object
-      if (typeof node.lineHeight === "object") {
-        if (node.lineHeight.unit === "PIXELS") {
-          styles.lineHeight = `${node.lineHeight.value}px`;
-        } else if (node.lineHeight.unit === "PERCENT") {
-          styles.lineHeight = `${node.lineHeight.value}%`;
-        }
-      } else {
-        styles.lineHeight = `${node.lineHeight}px`;
-      }
-    }
-    if (node.textCase === "UPPER") {
-      styles.textTransform = "uppercase";
-    }
-    if (node.textCase === "LOWER") {
-      styles.textTransform = "lowercase";
-    }
-    if (node.textCase === "TITLE") {
-      styles.textTransform = "capitalize";
-    }
-    if (node.textDecoration === "UNDERLINE") {
-      styles.textDecoration = "underline";
-    }
-  }
-
-  if ("visible" in node) {
-    styles.display = node.visible ? "flex" : "none";
-  }
-
-  if ("layoutMode" in node) {
-    styles.flexDirection = node.layoutMode === "HORIZONTAL" ? "row" : "column";
-  }
-
-  // if auto layout is disabled then set position to absolute and top left
-  // if (
-  //   ("layoutMode" in node && node.layoutMode === "NONE") ||
-  //   !node.layoutMode
-  // ) {
-  //   styles.position = "absolute";
-  //   styles.top = `${node.y}px`;
-  //   styles.left = `${node.x}px`;
-  // }
-
-  // gap
-  if ("itemSpacing" in node) {
-    styles.gap = `${node.itemSpacing}px`;
-  }
-
-  if ("primaryAxisAlignItems" in node) {
-    switch (node.primaryAxisAlignItems) {
-      case "MIN":
-        styles.justifyContent = "flex-start";
-        break;
-      case "CENTER":
-        styles.justifyContent = "center";
-        break;
-      case "MAX":
-        styles.justifyContent = "flex-end";
-        break;
-      case "SPACE_BETWEEN":
-        styles.justifyContent = "space-between";
-        break;
-    }
-  }
-
-  if ("counterAxisAlignItems" in node) {
-    switch (node.counterAxisAlignItems) {
-      case "MIN":
-        styles.alignItems = "flex-start";
-        break;
-      case "CENTER":
-        styles.alignItems = "center";
-        break;
-      case "MAX":
-        styles.alignItems = "flex-end";
-        break;
-    }
-  }
-
-  if (node.type !== "TEXT") {
-    if (
-      "layoutMode" in node &&
-      node.layoutMode === "HORIZONTAL" &&
-      "primaryAxisSizingMode" in node &&
-      node.primaryAxisSizingMode === "FIXED"
-    ) {
-      styles.width = `${node.width}px`;
-    }
-    if (
-      "layoutMode" in node &&
-      node.layoutMode === "VERTICAL" &&
-      "primaryAxisSizingMode" in node &&
-      node.primaryAxisSizingMode === "FIXED"
-    ) {
-      styles.height = `${node.height}px`;
-    }
-    if (isImage(node)) {
-      if ("height" in node) {
-        styles.height = `${Math.round(node.height)}px`;
-      }
-      if ("width" in node) {
-        styles.width = `${Math.round(node.width)}px`;
-      }
-    }
-  }
-
-  if ("cornerRadius" in node) {
-    if (typeof node.cornerRadius !== "symbol") {
-      styles.borderRadius = `${node.cornerRadius}px`;
-    }
-  }
-
-  if ("strokes" in node && node.strokes.length > 0) {
-    const stroke = node.strokes[0];
-    if (stroke.type === "SOLID") {
-      styles.borderColor = rgbToRGBAString(stroke.color);
-      if ("strokeWeight" in node) {
-        if (typeof node.strokeWeight !== "symbol") {
-          if (node.type === "TEXT") {
-            // styles.textStrokeWidth = `${node.strokeWeight}px`;
-          } else {
-            styles.borderWidth = `${node.strokeWeight}px`;
-          }
-        }
-      }
-    }
-  }
-
-  if (
-    "fills" in node &&
-    node.fills &&
-    typeof node.fills !== "symbol" &&
-    node.fills.length > 0
-  ) {
-    if (node.type === "TEXT") {
-      const fill = node.fills[0];
-      if (fill.type === "SOLID") {
-        styles.color = rgbToRGBAString(fill.color, fill.opacity);
-      }
-    } else {
-      const fill = node.fills[0];
-      if (fill.type === "SOLID") {
-        styles.background = rgbToRGBAString(fill.color, fill.opacity);
-      }
-    }
-  }
-
-  // padding
-  if ("paddingLeft" in node) {
-    styles.paddingLeft = `${node.paddingLeft}px`;
-  }
-  if ("paddingRight" in node) {
-    styles.paddingRight = `${node.paddingRight}px`;
-  }
-  if ("paddingTop" in node) {
-    styles.paddingTop = `${node.paddingTop}px`;
-  }
-  if ("paddingBottom" in node) {
-    styles.paddingBottom = `${node.paddingBottom}px`;
-  }
-
-  if (isImage(node)) {
-    styles.objectFit = getObjectFit(node);
-  }
-
-  return styles;
 }
 
-async function getRawStyles(node: SceneNode) {
+async function getRawStyles(node: SceneNode, css: Record<string, string>) {
   const styles: Record<string, string | number> = {};
 
-  const css = await node.getCSSAsync();
-
   for (const key in css) {
-    if (!BASE_STYLE_PROPERTIES.includes(key)) {
+    if (BASE_STYLE_PROPERTIES.indexOf(key) === -1) {
       styles[key] = css[key];
     }
   }
 
-  const convertedStyles = {};
-  // convert border-color to borderColor
+  const convertedStyles = {} as Record<string, string | number>;
   for (const key in styles) {
     convertedStyles[kebabToCamelCase(key)] = styles[key];
   }
-
   return convertedStyles;
-
-  // if vector
-  if (isSVG(node)) {
-    return styles;
-  }
-
-  // if ("rotation" in node) {
-  //   styles.transform = `rotate(${node.rotation}deg)`;
-
-  //   if ("layoutMode" in node && node.layoutMode === "HORIZONTAL") {
-  //     styles.transform = `rotate(${node.rotation}deg)`;
-  //   }
-  // }
-
-  if ("opacity" in node && node.opacity !== 1) {
-    styles.opacity = node.opacity;
-  }
-
-  // if (
-  //   "blendMode" in node &&
-  //   (node.blendMode === "PASS_THROUGH" || node.blendMode === "NORMAL")
-  // ) {
-  //   styles.mixBlendMode = node.blendMode.toLowerCase();
-  // }
-
-  if ("effects" in node && node.effects.length > 0) {
-    const effect = node.effects[0];
-    if (effect.type === "DROP_SHADOW") {
-      styles.boxShadow = `${effect.offset.x}px ${effect.offset.y}px ${
-        effect.radius
-      }px ${rgbToRGBAString(effect.color)}`;
-    }
-  }
-
-  // if ("strokeAlign" in node) {
-  //   styles.borderStyle = node.strokeAlign;
-  // }
-
-  return styles;
 }
 
 function getElementType(node: SceneNode) {
@@ -545,50 +294,5 @@ function getElementType(node: SceneNode) {
       return "hr";
     default:
       return "div";
-  }
-}
-
-function getObjectFit(node: SceneNode) {
-  const fill = node.fills[0];
-  if (fill.type === "IMAGE") {
-    switch (fill.scaleMode) {
-      case "FILL":
-        return "cover";
-      case "FIT":
-        return "contain";
-      case "TILE":
-        return "repeat";
-      default:
-        return "cover";
-    }
-  } else {
-    return "cover";
-  }
-}
-
-// function rgbToHex(color: RGB) {
-//   console.log(color);
-
-//   const r = Math.round(color.r * 255)
-//     .toString(16)
-//     .padStart(2, "0");
-//   const g = Math.round(color.g * 255)
-//     .toString(16)
-//     .padStart(2, "0");
-//   const b = Math.round(color.b * 255)
-//     .toString(16)
-//     .padStart(2, "0");
-//   return `#${r}${g}${b}`;
-// }
-
-function rgbToRGBAString(color: RGB, opacity = 1) {
-  if (opacity < 1) {
-    return `rgba(${Math.round(color.r * 255)}, ${Math.round(
-      color.g * 255
-    )}, ${Math.round(color.b * 255)}, ${opacity})`;
-  } else {
-    return `rgb(${Math.round(color.r * 255)}, ${Math.round(
-      color.g * 255
-    )}, ${Math.round(color.b * 255)})`;
   }
 }
