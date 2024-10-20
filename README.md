@@ -1,40 +1,36 @@
 Below are the steps to get your plugin running. You can also find instructions at:
+### Quickstart Guide
 
-  https://www.figma.com/plugin-docs/plugin-quickstart-guide/
+This plugin template uses **TypeScript** and **NPM**, two standard tools for creating JavaScript applications.
 
-This plugin template uses Typescript and NPM, two standard tools in creating JavaScript applications.
+#### Prerequisites
 
-First, download Node.js which comes with NPM. This will allow you to install TypeScript and other
-libraries. You can find the download link here:
-
-  https://nodejs.org/en/download/
-
-Next, install TypeScript using the command:
-
+1. **Download Node.js** (which includes NPM) from [nodejs.org](https://nodejs.org/en/download/).
+2. **Install TypeScript** globally using the command:
+  ```sh
   npm install -g typescript
-
-Finally, in the directory of your plugin, get the latest type definitions for the plugin API by running:
-
+  ```
+3. **Install Plugin API Type Definitions** in your plugin directory:
+  ```sh
   npm install --save-dev @figma/plugin-typings
+  ```
 
-If you are familiar with JavaScript, TypeScript will look very familiar. In fact, valid JavaScript code
-is already valid Typescript code.
+#### Setup
 
-TypeScript adds type annotations to variables. This allows code editors such as Visual Studio Code
-to provide information about the Figma API while you are writing code, as well as help catch bugs
-you previously didn't notice.
+1. **Clone the repository**.
+2. **Install the dependencies**:
+  ```sh
+  npm install
+  ```
+3. **Build the plugin**:
+  ```sh
+  npm run watch
+  ```
+4. **Link the plugin in Figma**:
+  1. Go to the `Plugins` section in Figma.
+  2. Click on the `Development` tab.
+  3. Click on the `Import Plugin from Manifest` button.
+  4. Select the `manifest.json` file in the `frappe-builder` plugin directory.
 
-For more information, visit https://www.typescriptlang.org/
 
-Using TypeScript requires a compiler to convert TypeScript (code.ts) into JavaScript (code.js)
-for the browser to run.
-
-We recommend writing TypeScript code using Visual Studio code:
-
-1. Download Visual Studio Code if you haven't already: https://code.visualstudio.com/.
-2. Open this directory in Visual Studio Code.
-3. Compile TypeScript to JavaScript: Run the "Terminal > Run Build Task..." menu item,
-    then select "npm: watch". You will have to do this again every time
-    you reopen Visual Studio Code.
-
-That's it! Visual Studio Code will regenerate the JavaScript file every time you save.
+For more detailed instructions, refer to the [Figma Plugin Quickstart Guide](https://www.figma.com/plugin-docs/plugin-quickstart-guide/).
