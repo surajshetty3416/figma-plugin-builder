@@ -26,7 +26,7 @@
     } else if (type === "selection") {
       document.getElementById("no-frame").style.display = "none";
       document.getElementById("copy").style.display = "grid";
-      document.getElementById("current-selection").innerText = `${message}`;
+      // document.getElementById("current-selection").innerText = `${message}`;
     } else if (type === "copy-to-clipboard") {
       dataToCopy = message;
       document.execCommand("copy");

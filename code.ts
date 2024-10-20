@@ -8,7 +8,6 @@
 
 // This shows the HTML page in "ui.html".
 figma.showUI(__html__);
-
 // Calls to "parent.postMessage" from within the HTML page will trigger this
 // callback. The callback will be passed the "pluginMessage" property of the
 // posted message.
@@ -88,7 +87,9 @@ function kebabToCamelCase(str: string) {
   });
 }
 
+let logged = false;
 async function convertToJSON() {
+  logged = false;
   const pages = figma.currentPage.selection;
   const result = [];
 
@@ -101,7 +102,6 @@ async function convertToJSON() {
 
 async function convertPage(page: SceneNode): Promise<Block> {
   const converted = await convertNode(page);
-  console.log(converted);
   return converted;
 }
 
@@ -131,6 +131,15 @@ async function convertNode(node: SceneNode): Promise<Block> {
       : [];
 
   const nodeStyles = await node.getCSSAsync();
+
+  for (const key in nodeStyles) {
+    nodeStyles[key] = cleanUpValue(nodeStyles[key]);
+  }
+
+  if (!logged) {
+    console.log(nodeStyles);
+    logged = true;
+  }
   const baseStyles = await getBaseStyles(node, nodeStyles);
   const rawStyles = await getRawStyles(node, nodeStyles);
 
@@ -249,6 +258,20 @@ async function getBaseStyles(node: SceneNode, css: Record<string, string>) {
     styles.overflowY = "hidden";
   }
 
+  // set background color
+  if (
+    "fills" in node &&
+    node.fills &&
+    typeof node.fills !== "symbol" &&
+    node.fills.length > 0 &&
+    node.type !== "TEXT"
+  ) {
+    const fill = node.fills[0];
+    if (fill.type === "SOLID") {
+      styles.background = rgbToRGBAString(fill.color, fill.opacity);
+    }
+  }
+
   const convertedStyles = {} as Record<string, string | number>;
   // convert border-color to borderColor
   for (const key in styles) {
@@ -295,4 +318,30 @@ function getElementType(node: SceneNode) {
     default:
       return "div";
   }
+}
+
+function rgbToRGBAString(color: RGB, opacity = 1) {
+  if (opacity < 1) {
+    return `rgba(${Math.round(color.r * 255)}, ${Math.round(
+      color.g * 255
+    )}, ${Math.round(color.b * 255)}, ${opacity})`;
+  } else {
+    return `rgb(${Math.round(color.r * 255)}, ${Math.round(
+      color.g * 255
+    )}, ${Math.round(color.b * 255)})`;
+  }
+}
+
+function cleanUpValue(value: string) {
+  // strip out comments
+  value = value.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, "");
+
+  // convert color to rgba
+  // const colorMatch = value.match(/color\(([^)]+)\)/) as RegExpMatchArray | null;
+  // if (colorMatch) {
+  //   const color = Color(colorMatch[1]);
+  //   console.log(color.to("rgba").toString());
+  //   value = value.replace(colorMatch[0], color.to("rgba").toString());
+  // }
+  return value;
 }
