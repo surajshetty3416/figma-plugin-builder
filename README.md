@@ -1,4 +1,3 @@
-Below are the steps to get your plugin running. You can also find instructions at:
 ### Quickstart Guide
 
 This plugin template uses **TypeScript** and **NPM**, two standard tools for creating JavaScript applications.
