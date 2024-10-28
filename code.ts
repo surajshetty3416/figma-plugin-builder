@@ -137,11 +137,12 @@ async function convertNode(node: SceneNode): Promise<Block> {
   }
 
   if (!logged) {
-    console.log(nodeStyles);
     logged = true;
   }
   const baseStyles = await getBaseStyles(node, nodeStyles);
   const rawStyles = await getRawStyles(node, nodeStyles);
+
+  console.log(node.type, baseStyles, rawStyles, node);
 
   const originalElement = isSVG(node) ? "__raw_html__" : "";
   const baseNode = {
@@ -272,12 +273,45 @@ async function getBaseStyles(node: SceneNode, css: Record<string, string>) {
     }
   }
 
+  // remove background if it is an image since we are handling it separately
+  if (isImage(node)) {
+    delete styles.background;
+  }
+
+  // remove background color from SVGs
+  if (isSVG(node)) {
+    delete styles.background;
+  }
+
   const convertedStyles = {} as Record<string, string | number>;
   // convert border-color to borderColor
   for (const key in styles) {
     convertedStyles[kebabToCamelCase(key)] = styles[key];
   }
 
+  // for some reason getAsyncCSS doesn't return width and height for some nodes
+  // so we need to manually set them
+  if ("layoutMode" in node) {
+    let layoutMode = node.layoutMode;
+    if (layoutMode === "NONE") {
+      layoutMode = "VERTICAL";
+    }
+    if (layoutMode === "HORIZONTAL") {
+      if (
+        node.counterAxisSizingMode === "FIXED" ||
+        node.primaryAxisSizingMode === "FIXED"
+      ) {
+        convertedStyles.width = `${node.width}px`;
+      }
+    } else if (layoutMode === "VERTICAL") {
+      if (
+        node.counterAxisSizingMode === "FIXED" ||
+        node.primaryAxisSizingMode === "FIXED"
+      ) {
+        convertedStyles.height = `${node.height}px`;
+      }
+    }
+  }
   return convertedStyles;
 }
 
@@ -287,6 +321,18 @@ async function getRawStyles(node: SceneNode, css: Record<string, string>) {
   for (const key in css) {
     if (BASE_STYLE_PROPERTIES.indexOf(key) === -1) {
       styles[key] = css[key];
+    }
+  }
+
+  // remove defaults like fontStyle normal, fontWeight 400, etc
+  const defaultStyleMap = {
+    "font-style": "normal",
+    "font-weight": "400",
+  } as Record<string, string>;
+
+  for (const key in defaultStyleMap) {
+    if (key in styles && styles[key] === defaultStyleMap[key]) {
+      delete styles[key];
     }
   }
 
