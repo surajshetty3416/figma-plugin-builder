@@ -123,12 +123,15 @@ type Block = {
 };
 
 async function convertNode(node: SceneNode): Promise<Block> {
-  const children =
-    "children" in node
-      ? await Promise.all(
-          node.children.filter((child) => child.visible).map(convertNode)
-        )
-      : [];
+  let children = [] as Block[];
+  if (!isSVG(node)) {
+    children =
+      "children" in node
+        ? await Promise.all(
+            node.children.filter((child) => child.visible).map(convertNode)
+          )
+        : [];
+  }
 
   const nodeStyles = await node.getCSSAsync();
 
@@ -141,8 +144,6 @@ async function convertNode(node: SceneNode): Promise<Block> {
   }
   const baseStyles = await getBaseStyles(node, nodeStyles);
   const rawStyles = await getRawStyles(node, nodeStyles);
-
-  console.log(node.type, baseStyles, rawStyles, node);
 
   const originalElement = isSVG(node) ? "__raw_html__" : "";
   const baseNode = {
@@ -175,7 +176,7 @@ async function convertNode(node: SceneNode): Promise<Block> {
       typeof node.fills === "object" &&
       node.fills.length > 0
     ) {
-      const paint = node.fills[0];
+      const paint = node.fills.find((fill) => fill.type === "IMAGE") as Paint;
       if (paint.type === "IMAGE" && paint.imageHash) {
         const image = figma.getImageByHash(paint.imageHash);
         if (image) {
@@ -196,7 +197,8 @@ function isSVG(node: SceneNode) {
     node.type === "VECTOR" ||
     node.type === "ELLIPSE" ||
     node.type === "POLYGON" ||
-    node.type === "STAR"
+    node.type === "STAR" ||
+    node.type === "BOOLEAN_OPERATION"
   );
 }
 
@@ -205,7 +207,7 @@ function isImage(node: SceneNode) {
     node.type === "RECTANGLE" &&
     typeof node.fills === "object" &&
     node.fills.length > 0 &&
-    node.fills[0].type === "IMAGE"
+    node.fills.filter((fill) => fill.type === "IMAGE").length > 0
   );
 }
 
@@ -264,17 +266,28 @@ async function getBaseStyles(node: SceneNode, css: Record<string, string>) {
     "fills" in node &&
     node.fills &&
     typeof node.fills !== "symbol" &&
-    node.fills.length > 0 &&
-    node.type !== "TEXT"
+    node.fills.length > 0
   ) {
-    const fill = node.fills[0];
-    if (fill.type === "SOLID") {
-      styles.background = rgbToRGBAString(fill.color, fill.opacity);
+    const fill = node.fills.find((fill) => fill.type === "SOLID");
+    if (fill) {
+      const color = rgbToRGBAString(fill.color, fill.opacity);
+      if (node.type === "TEXT") {
+        styles.color = color;
+      } else {
+        styles.background = color;
+      }
     }
   }
 
   // remove background if it is an image since we are handling it separately
-  if (isImage(node)) {
+  // only if fills has solid color
+  if (
+    "fills" in node &&
+    node.fills &&
+    typeof node.fills !== "symbol" &&
+    node.fills.length > 0 &&
+    !node.fills.filter((fill) => fill.type === "SOLID").length
+  ) {
     delete styles.background;
   }
 
