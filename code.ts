@@ -106,7 +106,6 @@ async function convertPage(page: SceneNode): Promise<Block> {
 }
 
 type Block = {
-  blockId: string;
   children: Block[];
   baseStyles: Record<string, string | number>;
   originalElement: string;
@@ -145,9 +144,10 @@ async function convertNode(node: SceneNode): Promise<Block> {
   const baseStyles = await getBaseStyles(node, nodeStyles);
   const rawStyles = await getRawStyles(node, nodeStyles);
 
+  // console.log(node.type, nodeStyles);
+
   const originalElement = isSVG(node) ? "__raw_html__" : "";
   const baseNode = {
-    blockId: node.id,
     children: children,
     baseStyles: baseStyles,
     rawStyles: rawStyles,
@@ -247,7 +247,7 @@ async function getBaseStyles(node: SceneNode, css: Record<string, string>) {
 
   // display none if not visible
   if ("visible" in node) {
-    styles.display = node.visible ? "flex" : "none";
+    styles.display = node.visible ? styles.display : "none";
   }
 
   // strip out quotes from font-family value
