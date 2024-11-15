@@ -144,7 +144,7 @@ async function convertNode(node: SceneNode): Promise<Block> {
   const baseStyles = await getBaseStyles(node, nodeStyles);
   const rawStyles = await getRawStyles(node, nodeStyles);
 
-  // console.log(node.type, nodeStyles);
+  // console.log(node.type, nodeStyles, node);
 
   const originalElement = isSVG(node) ? "__raw_html__" : "";
   const baseNode = {
@@ -204,7 +204,7 @@ function isSVG(node: SceneNode) {
 
 function isImage(node: SceneNode) {
   return (
-    node.type === "RECTANGLE" &&
+    (node.type === "RECTANGLE" || node.type === "FRAME") &&
     typeof node.fills === "object" &&
     node.fills.length > 0 &&
     node.fills.filter((fill) => fill.type === "IMAGE").length > 0
