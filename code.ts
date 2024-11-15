@@ -256,7 +256,7 @@ async function getBaseStyles(node: SceneNode, css: Record<string, string>) {
   }
 
   // overflow hidden
-  if (node.type === "FRAME" || node.type === "GROUP") {
+  if (node.type === "FRAME" && node.clipsContent) {
     styles.overflowX = "hidden";
     styles.overflowY = "hidden";
   }
