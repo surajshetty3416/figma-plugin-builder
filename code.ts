@@ -198,7 +198,8 @@ function isSVG(node: SceneNode) {
     node.type === "ELLIPSE" ||
     node.type === "POLYGON" ||
     node.type === "STAR" ||
-    node.type === "BOOLEAN_OPERATION"
+    node.type === "BOOLEAN_OPERATION" ||
+    node.type === "GROUP"
   );
 }
 
