@@ -161,20 +161,15 @@ function kebabToCamelCase(str: string): string {
 
 function isSVG(node: SceneNode, pure = false): boolean {
   if (
-    ["INSTANCE", "FRAME"].includes(node.type) &&
+    ["INSTANCE", "FRAME", "GROUP"].includes(node.type) &&
     "children" in node &&
     !pure
   ) {
     return node.children.every((child) => isSVG(child, true));
   }
-  return [
-    "VECTOR",
-    "ELLIPSE",
-    "POLYGON",
-    "STAR",
-    "BOOLEAN_OPERATION",
-    "GROUP",
-  ].includes(node.type);
+  return ["VECTOR", "ELLIPSE", "POLYGON", "STAR", "BOOLEAN_OPERATION"].includes(
+    node.type
+  );
 }
 
 function isImage(node: SceneNode): boolean {
