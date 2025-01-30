@@ -290,6 +290,13 @@ async function processNodeSpecificStyles(node: SceneNode, styles: StyleRecord) {
     styles.overflowY = "hidden";
   }
 
+  if (isImage(node)) {
+    styles.objectFit = "cover";
+    if ((styles.background as string).includes("url(<path")) {
+      delete styles.background;
+    }
+  }
+
   processLayoutStyles(node, styles);
   await processFillStyles(node, styles);
 }
