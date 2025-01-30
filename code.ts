@@ -134,6 +134,8 @@ async function convertNode(node: SceneNode): Promise<Block> {
   const rawStyles = await getRawStyles(node, cleanedStyles);
   const element = getElementType(node);
 
+  console.log("Node:", node.name, "Element:", element, baseStyles);
+
   const baseNode: Block = {
     children,
     baseStyles,
@@ -355,7 +357,7 @@ async function processFillStyles(node: SceneNode, styles: StyleRecord) {
     return;
 
   const solidFill = node.fills.find(
-    (fill) => fill.type === "SOLID"
+    (fill) => fill.type === "SOLID" && fill.visible
   ) as SolidPaint;
   if (!solidFill) return;
 
