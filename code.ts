@@ -140,7 +140,7 @@ async function convertNode(node: SceneNode): Promise<Block> {
     children,
     baseStyles,
     rawStyles,
-    originalElement: isSVG(node) ? "__raw_html__" : "",
+    originalElement: element === "svg" ? "__raw_html__" : "",
     mobileStyles: {},
     tabletStyles: {},
     attributes: {},
@@ -222,8 +222,8 @@ async function getSVGFromVector(node: SceneNode): Promise<string> {
 }
 
 function getElementType(node: SceneNode): string {
-  if (isSVG(node)) return "svg";
   if (isImage(node)) return "img";
+  if (isSVG(node)) return "svg";
 
   const elementMap: Record<string, string> = {
     TEXT: "p",
