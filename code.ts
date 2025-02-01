@@ -176,7 +176,7 @@ function isSVG(node: SceneNode, pure = false): boolean {
 
 function isImage(node: SceneNode): boolean {
   return (
-    (node.type === "RECTANGLE" || node.type === "FRAME") &&
+    ["INSTANCE", "RECTANGLE", "FRAME"].includes(node.type) &&
     "fills" in node &&
     Array.isArray(node.fills) &&
     node.fills.some((fill) => fill.type === "IMAGE")
