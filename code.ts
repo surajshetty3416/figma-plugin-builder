@@ -12,6 +12,7 @@ type Block = {
   baseStyles: StyleRecord;
   originalElement: string;
   rawStyles: StyleRecord;
+  blockName?: string;
   mobileStyles: StyleRecord;
   tabletStyles: StyleRecord;
   attributes: StyleRecord;
@@ -134,8 +135,6 @@ async function convertNode(node: SceneNode): Promise<Block> {
   const rawStyles = await getRawStyles(node, cleanedStyles);
   const element = getElementType(node);
 
-  console.log("Node:", node.name, "Element:", element, baseStyles);
-
   const baseNode: Block = {
     children,
     baseStyles,
@@ -149,6 +148,7 @@ async function convertNode(node: SceneNode): Promise<Block> {
     innerText: "",
     dataKey: null,
     element,
+    blockName: node.name,
     customAttributes: {},
   };
 
