@@ -330,6 +330,9 @@ async function getRawStyles(
 }
 
 function processLayoutStyles(node: SceneNode, styles: StyleRecord) {
+  if (styles.width && shouldUsePercentage(node)) {
+    styles.width = "100%";
+  }
   if (!("layoutMode" in node)) return;
 
   const layoutMode = ["AUTO", "NONE"].includes(node?.layoutMode || "AUTO")
