@@ -301,6 +301,31 @@ async function processNodeSpecificStyles(node: SceneNode, styles: StyleRecord) {
     }
   }
 
+  // if any child is positioned, set parent to relative
+  // if any child is positioned, set parent to relative
+  if (
+    (!styles.position || styles.position === "static") &&
+    "children" in node &&
+    node.children.some(
+      (child) =>
+        (child.x || child.y) &&
+        (child as FrameNode)?.layoutPositioning === "ABSOLUTE"
+    )
+  ) {
+    styles.position = "relative";
+  }
+  if (
+    (!styles.position || styles.position === "static") &&
+    "children" in node &&
+    node.children.some(
+      (child) =>
+        (child.x || child.y) &&
+        (child as FrameNode)?.layoutPositioning === "ABSOLUTE"
+    )
+  ) {
+    styles.position = "relative";
+  }
+
   processLayoutStyles(node, styles);
   await processFillStyles(node, styles);
 }
