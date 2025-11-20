@@ -123,9 +123,14 @@ async function convertPage(page: SceneNode): Promise<Block> {
 
 async function convertNode(node: SceneNode): Promise<Block> {
   const children =
-    !isSVG(node) && "children" in node
+    !(isSVG(node) || isImage(node)) && "children" in node
       ? await Promise.all(
-          node.children.filter((child) => child.visible).map(convertNode)
+          node.children
+            .filter(
+              (child) =>
+                child.visible && !(child.type === "VECTOR" && child.isMask)
+            )
+            .map(convertNode)
         )
       : [];
 
@@ -159,6 +164,15 @@ async function convertNode(node: SceneNode): Promise<Block> {
     customAttributes: {},
   };
 
+  // if sibling are of type mask, convert mask to clip path
+  // find siblings of type mask
+  node.parent?.children.forEach((child) => {
+    if (child.type === "VECTOR" && child.isMask) {
+      // baseNode.baseStyles["mask"] = getMaskStyle(child as VectorNode);
+      baseNode.baseStyles["clip-path"] = getClipPathStyle(child as VectorNode);
+    }
+  });
+
   await updateNodeContent(node, baseNode);
   return baseNode;
 }
@@ -176,18 +190,24 @@ function isSVG(node: SceneNode, pure = false): boolean {
   ) {
     return node.children.every((child) => isSVG(child, true));
   }
-  return ["VECTOR", "ELLIPSE", "POLYGON", "STAR", "BOOLEAN_OPERATION"].includes(
-    node.type
+  return (
+    ["VECTOR", "ELLIPSE", "POLYGON", "STAR", "BOOLEAN_OPERATION"].includes(
+      node.type
+    ) && !isImage(node)
   );
 }
 
 function isImage(node: SceneNode): boolean {
   return (
-    ["INSTANCE", "RECTANGLE", "FRAME"].includes(node.type) &&
     "fills" in node &&
     Array.isArray(node.fills) &&
-    node.fills.some((fill) => fill.type === "IMAGE")
+    node.fills.some((fill) => fill.type === "IMAGE") &&
+    !hasChildren(node)
   );
+}
+
+function hasChildren(node: SceneNode): boolean {
+  return "children" in node && node.children.length > 0;
 }
 
 async function updateNodeContent(node: SceneNode, baseNode: Block) {
@@ -197,23 +217,73 @@ async function updateNodeContent(node: SceneNode, baseNode: Block) {
     baseNode.innerHTML = await getSVGFromVector(node);
   } else if (baseNode.element === "img") {
     await handleImageNode(node, baseNode);
+  } else {
+    await setBackgroundImage(node, baseNode);
   }
 }
 
 async function handleImageNode(node: SceneNode, baseNode: Block) {
   if (!("fills" in node) || !Array.isArray(node.fills)) return;
 
-  const imageFill = node.fills.find(
-    (fill) => fill.type === "IMAGE"
-  ) as ImagePaint;
+  // Find any image fill
+  const imageFill = node.fills?.find(
+    (fill): fill is ImagePaint => fill.type === "IMAGE" && fill.visible
+  );
   if (!imageFill?.imageHash) return;
+
+  try {
+    const image = figma.getImageByHash(imageFill.imageHash);
+    if (!image) return;
+
+    const bytes = await image.getBytesAsync();
+    if (!bytes || bytes.length === 0) return;
+
+    const url = `data:image/png;base64,${figma.base64Encode(bytes)}`;
+    baseNode.attributes.src = url;
+
+    // Handle image transformations
+    if (imageFill.scaleMode === "FILL") {
+      baseNode.baseStyles.objectFit = "cover";
+    } else if (imageFill.scaleMode === "FIT") {
+      baseNode.baseStyles.objectFit = "contain";
+    }
+
+    // Handle rotation
+    if (imageFill.rotation) {
+      baseNode.baseStyles.transform = `rotate(${imageFill.rotation}deg)`;
+    }
+
+    // Handle opacity
+    if (imageFill.opacity !== undefined && imageFill.opacity !== 1) {
+      baseNode.baseStyles.opacity = imageFill.opacity;
+    }
+  } catch (error) {
+    console.error("Error processing image:", error);
+  }
+}
+
+async function setBackgroundImage(node: SceneNode, baseNode: Block) {
+  if (!("fills" in node) || !Array.isArray(node.fills)) return;
+
+  const imageFill = node.fills.find(
+    (fill) => fill.type === "IMAGE" && fill.visible
+  ) as ImagePaint;
+  if (!imageFill || !imageFill.imageHash) return;
 
   const image = figma.getImageByHash(imageFill.imageHash);
   if (!image) return;
 
   const bytes = await image.getBytesAsync();
+  if (!bytes || bytes.length === 0) return;
+
   const url = `data:image/png;base64,${figma.base64Encode(bytes)}`;
-  baseNode.attributes.src = url;
+  const bgSize =
+    imageFill.scaleMode === "FILL"
+      ? "cover"
+      : imageFill.scaleMode === "FIT"
+      ? "contain"
+      : "auto";
+  baseNode.baseStyles.background = `url(${url}) center center / ${bgSize} no-repeat`;
 }
 
 async function getSVGFromVector(node: SceneNode): Promise<string> {
@@ -295,25 +365,11 @@ async function processNodeSpecificStyles(node: SceneNode, styles: StyleRecord) {
   }
 
   if (isImage(node)) {
-    styles.objectFit = "cover";
     if ((styles.background as string).includes("url(<path")) {
       delete styles.background;
     }
   }
 
-  // if any child is positioned, set parent to relative
-  // if any child is positioned, set parent to relative
-  if (
-    (!styles.position || styles.position === "static") &&
-    "children" in node &&
-    node.children.some(
-      (child) =>
-        (child.x || child.y) &&
-        (child as FrameNode)?.layoutPositioning === "ABSOLUTE"
-    )
-  ) {
-    styles.position = "relative";
-  }
   if (
     (!styles.position || styles.position === "static") &&
     "children" in node &&
@@ -402,4 +458,16 @@ async function processFillStyles(node: SceneNode, styles: StyleRecord) {
   if (!node.fills.some((fill) => fill.type === "SOLID") || isSVG(node)) {
     delete styles.background;
   }
+}
+
+function getClipPathStyle(mask: VectorNode): string {
+  const clipPath = mask.vectorPaths
+    .map((path) => {
+      return `<path d="${path.data}" />`;
+    })
+    .join("");
+
+  return `url("data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${mask.width} ${mask.height}'><clipPath id='clip-path-${mask.id}'>${clipPath}</clipPath></svg>`
+  )}#clip-path-${mask.id}`;
 }
