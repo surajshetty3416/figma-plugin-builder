@@ -384,6 +384,7 @@ async function processNodeSpecificStyles(node: SceneNode, styles: StyleRecord) {
 
   processLayoutStyles(node, styles);
   await processFillStyles(node, styles);
+  processStrokeStyles(node, styles);
 }
 
 async function getRawStyles(
@@ -441,6 +442,35 @@ function processLayoutStyles(node: SceneNode, styles: StyleRecord) {
 function shouldUsePercentage(node: SceneNode): boolean {
   // @ts-expect-error: parent property exists at runtime
   return node.width > 1000 || (node.parent && node.width === node.parent.width);
+}
+
+function processStrokeStyles(node: SceneNode, styles: StyleRecord) {
+  if (!("strokes" in node) || !node.strokes || !Array.isArray(node.strokes)) {
+    return;
+  }
+
+  const visibleStroke = node.strokes.find(
+    (stroke) => stroke.visible && stroke.type === "SOLID"
+  ) as SolidPaint;
+
+  if (!visibleStroke) return;
+
+  const strokeWeight =
+    "strokeWeight" in node && typeof node.strokeWeight === "number"
+      ? node.strokeWeight
+      : 1;
+  const color = rgbToRGBAString(
+    visibleStroke.color,
+    visibleStroke.opacity || 1
+  );
+
+  styles["border-width"] = `${strokeWeight}px`;
+  styles["border-style"] = "solid";
+  styles["border-color"] = color;
+
+  if ("strokeAlign" in node && node.strokeAlign === "INSIDE") {
+    styles.boxSizing = "border-box";
+  }
 }
 
 async function processFillStyles(node: SceneNode, styles: StyleRecord) {
