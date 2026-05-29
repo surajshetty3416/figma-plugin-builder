@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>/* STYLES */</style>
+</head>
+<body>
+
+<!-- Empty state -->
+<div id="no-frame" role="status">
+  <p>No frame selected</p>
+  <p>Select a frame to copy into Builder.</p>
+</div>
+
+<!-- Copy panel -->
+<div id="copy">
+  <div class="frame-row" aria-live="polite">
+    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+      <rect x=".5" y=".5" width="10" height="10" rx="1.5" stroke="currentColor"/>
+      <path d="M3 .5v10M8 .5v10M.5 3h10M.5 8h10" stroke="currentColor" stroke-linecap="round"/>
+    </svg>
+    <span id="frame-name">Frame</span>
+  </div>
+
+  <div class="btn-wrap">
+    <button id="copy-button">Copy Frame</button>
+  </div>
+
+  <details id="opts-details" open>
+    <summary>
+      Options
+      <svg class="chevron" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </summary>
+    <div class="opts">
+      <label class="opt">
+        <span class="opt-label">Preserve CSS variables</span>
+        <span class="toggle"><input type="checkbox" id="opt-preserve-vars" checked /><span class="track"></span></span>
+      </label>
+      <label class="opt">
+        <span class="opt-label">Semantic headings</span>
+        <span class="toggle"><input type="checkbox" id="opt-semantic" checked /><span class="track"></span></span>
+      </label>
+      <label class="opt">
+        <span class="opt-label">Inline images</span>
+        <span class="toggle"><input type="checkbox" id="opt-inline-images" checked /><span class="track"></span></span>
+      </label>
+    </div>
+  </details>
+</div>
+
+<script>/* SCRIPT */</script>
+</body>
+</html>

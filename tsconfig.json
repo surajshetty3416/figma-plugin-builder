@@ -1,11 +1,14 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "lib": ["es2016"],
+    "lib": ["es2019"],
     "strict": true,
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules/@figma"
-    ]
+    "noEmit": true,
+    "rootDir": "src",
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "types": ["@figma/plugin-typings"]
   },
+  "include": ["src/**/*.ts"]
 }
+

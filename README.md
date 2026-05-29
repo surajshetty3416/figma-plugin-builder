@@ -1,3 +1,20 @@
+### Frappe Builder — Figma plugin
+
+Select a frame and copy it as Frappe Builder blocks (clipboard format
+`builder-copied-blocks`), then paste in the Builder editor.
+
+#### Copy options (in the plugin UI)
+- **Preserve CSS variables** (default on) — keeps `var(--x)` so Figma Variables
+  map to Builder Variables instead of being flattened to a fallback value.
+- **Semantic headings** (default on) — maps text to `h1`–`h6` by layer name
+  (`h1`…`h6`/`p`) or font size, instead of always `<p>`; emits `innerHTML`.
+- **Inline images** (default on) — embeds raster fills as base64; turn off to
+  paste an empty image and set the source in Builder.
+
+Build after editing `code.ts`: `npm run build` (or `npx tsc -p tsconfig.json`).
+
+---
+
 ### Quickstart Guide
 
 This plugin template uses **TypeScript** and **NPM**, two standard tools for creating JavaScript applications.
