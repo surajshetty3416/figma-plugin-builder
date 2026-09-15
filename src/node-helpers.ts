@@ -20,7 +20,8 @@ const ELEMENT_MAP: Record<string, string> = {
 };
 
 export function isSVG(node: SceneNode, pure = false): boolean {
-  if (!pure && CONTAINER_TYPES.has(node.type) && "children" in node) {
+  // an empty frame is a box with a fill or stroke, not artwork to export
+  if (!pure && CONTAINER_TYPES.has(node.type) && "children" in node && node.children.length > 0) {
     return node.children.every((child) => isSVG(child, true));
   }
   return VECTOR_TYPES.has(node.type) && !isImage(node);
@@ -37,6 +38,12 @@ export function isImage(node: SceneNode): boolean {
 
 export function hasChildren(node: SceneNode): boolean {
   return "children" in node && node.children.length > 0;
+}
+
+/** Containers whose children keep their own x and y instead of flowing in an auto layout. */
+export function isFreeformContainer(node: BaseNode): boolean {
+  if (node.type === "GROUP" || node.type === "SECTION") return true;
+  return "layoutMode" in node && node.layoutMode === "NONE";
 }
 
 export function getElementType(node: SceneNode): string {

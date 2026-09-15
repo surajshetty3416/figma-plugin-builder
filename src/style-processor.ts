@@ -1,6 +1,6 @@
 import { config } from "./config";
 import { BASE_STYLE_PROPERTIES, BASE_STYLE_SET } from "./constants";
-import { isImage, isSVG } from "./node-helpers";
+import { isFreeformContainer, isImage, isSVG } from "./node-helpers";
 import type { StyleRecord } from "./types";
 import { kebabToCamelCase, rgbToRGBAString, stripCSSVariables } from "./utils";
 
@@ -12,14 +12,18 @@ export function cleanUpValue(value: string): string {
   return config.stripVariables ? stripCSSVariables(value) : value;
 }
 
-export function getBaseStyles(node: SceneNode, css: StyleRecord): StyleRecord {
+export function getBaseStyles(
+  node: SceneNode,
+  css: StyleRecord,
+  parent?: SceneNode,
+): StyleRecord {
   // Single pass: pick allowed keys, then apply mutations.
   const styles: StyleRecord = {};
   for (const key of BASE_STYLE_PROPERTIES) {
     if (key in css) styles[key] = css[key];
   }
 
-  applyNodeSpecificStyles(node, styles);
+  applyNodeSpecificStyles(node, styles, parent);
 
   // Convert kebab keys to camelCase in a single pass.
   const result: StyleRecord = {};
@@ -43,7 +47,11 @@ export function getRawStyles(css: StyleRecord): StyleRecord {
 
 // ─── Node-specific style mutations ──────────────────────────────────────────
 
-function applyNodeSpecificStyles(node: SceneNode, styles: StyleRecord): void {
+function applyNodeSpecificStyles(
+  node: SceneNode,
+  styles: StyleRecord,
+  parent?: SceneNode,
+): void {
   if ("visible" in node && !node.visible) {
     styles.display = "none";
   }
@@ -61,21 +69,54 @@ function applyNodeSpecificStyles(node: SceneNode, styles: StyleRecord): void {
     delete styles.background;
   }
 
-  if (
-    (!styles.position || styles.position === "static") &&
-    "children" in node &&
-    node.children.some(
-      (child) =>
-        (child.x || child.y) &&
-        (child as FrameNode).layoutPositioning === "ABSOLUTE",
-    )
-  ) {
-    styles.position = "relative";
-  }
-
+  applyPositionStyles(node, parent, styles);
   applyLayoutStyles(node, styles);
   applyFillStyles(node, styles);
   applyStrokeStyles(node, styles);
+}
+
+// ─── Position ───────────────────────────────────────────────────────────────
+
+// Layers in a group, in a frame without auto layout, or set to ignore auto layout keep
+// their Figma position. Without it Builder lays them out in flow and stacks them.
+function applyPositionStyles(
+  node: SceneNode,
+  parent: SceneNode | undefined,
+  styles: StyleRecord,
+): void {
+  if (hasPositionedChildren(node)) {
+    if (!styles.position || styles.position === "static") styles.position = "relative";
+    // positioned children take no space, so the container keeps its Figma size
+    styles.width ??= `${node.width}px`;
+    styles.height ??= `${node.height}px`;
+  }
+  if (!parent || !isPositionedIn(node, parent)) return;
+
+  styles.position = "absolute";
+  styles.left = `${roundPx(offsetWithin(node, parent, 0))}px`;
+  styles.top = `${roundPx(offsetWithin(node, parent, 1))}px`;
+}
+
+function isPositionedIn(node: SceneNode, parent: BaseNode): boolean {
+  if (isFreeformContainer(parent)) return true;
+  return "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+}
+
+function hasPositionedChildren(node: SceneNode): boolean {
+  return (
+    "children" in node &&
+    node.children.some((child) => child.visible && isPositionedIn(child, node))
+  );
+}
+
+// absoluteTransform is in page coordinates, which also covers groups: a group's
+// children measure x and y from the group's parent, not from the group.
+function offsetWithin(node: SceneNode, parent: SceneNode, axis: 0 | 1): number {
+  return node.absoluteTransform[axis][2] - parent.absoluteTransform[axis][2];
+}
+
+function roundPx(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 // ─── Layout ─────────────────────────────────────────────────────────────────

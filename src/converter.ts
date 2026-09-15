@@ -12,12 +12,14 @@ import { escapeHTML } from "./utils";
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 export async function convertToJSON(): Promise<Block[]> {
-  return Promise.all(figma.currentPage.selection.map(convertNode));
+  return Promise.all(figma.currentPage.selection.map((node) => convertNode(node)));
 }
 
 // ─── Node conversion ─────────────────────────────────────────────────────────
 
-async function convertNode(node: SceneNode): Promise<Block> {
+// `parent` is only passed for layers inside the copied selection, so the copied
+// root is never positioned against a layer that isn't part of the paste.
+async function convertNode(node: SceneNode, parent?: SceneNode): Promise<Block> {
   // Fetch children and CSS concurrently — getCSSAsync can resolve while the
   // subtree is being processed, giving a meaningful speedup on deep frames.
   const [children, nodeStyles] = await Promise.all([
@@ -26,7 +28,7 @@ async function convertNode(node: SceneNode): Promise<Block> {
   ]);
 
   const css = cleanStyles(nodeStyles);
-  const baseStyles = getBaseStyles(node, css);
+  const baseStyles = getBaseStyles(node, css, parent);
   const rawStyles = getRawStyles(css);
   const element = getElementType(node);
 
@@ -61,7 +63,7 @@ async function collectChildren(node: SceneNode): Promise<Block[]> {
   const visible = node.children.filter(
     (child) => child.visible && !(child.type === "VECTOR" && child.isMask),
   );
-  return Promise.all(visible.map(convertNode));
+  return Promise.all(visible.map((child) => convertNode(child, node)));
 }
 
 function cleanStyles(raw: Record<string, string>): StyleRecord {
