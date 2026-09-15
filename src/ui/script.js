@@ -65,10 +65,15 @@ onmessage = (event) => {
 
 document.addEventListener("copy", (event) => {
   if (!dataToCopy) return;
-  event.clipboardData.setData(
-    "builder-copied-blocks",
-    JSON.stringify({ blocks: dataToCopy, components: [], variables: [] }),
-  );
+  const json = JSON.stringify({ blocks: dataToCopy, components: [], variables: [] });
+
+  // Figma desktop runs on Chromium, and Firefox can't read Chromium's custom clipboard
+  // types, so the blocks are also written as HTML, which Builder reads when needed.
+  const span = document.createElement("span");
+  span.setAttribute("data-builder-copied-blocks", json);
+
+  event.clipboardData.setData("builder-copied-blocks", json);
+  event.clipboardData.setData("text/html", span.outerHTML);
   event.preventDefault();
 });
 
