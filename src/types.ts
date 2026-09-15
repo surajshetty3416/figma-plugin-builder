@@ -7,15 +7,18 @@ export type PluginConfig = {
   inlineImages: boolean;
 };
 
+export type SelectionSummary = { name: string; detail: string };
+
 export type MessageTypes =
   | { type: "no-selection" }
-  | { type: "selection"; message: string }
+  | { type: "selection"; message: SelectionSummary }
   | { type: "copying" }
   | { type: "copied" }
+  | { type: "copy-failed" }
   | { type: "copy-data"; config?: Partial<PluginConfig> }
   | { type: "copy-to-clipboard"; message: Block[] }
   | { type: "resize"; height: number }
-  | { type: "notify"; message: string };
+  | { type: "notify"; message: string | null; error?: boolean; timeout?: number };
 
 export type StyleRecord = Record<string, string | number>;
 

@@ -1,10 +1,30 @@
 "use strict";
 
-let dataToCopy = null;
 const $ = (id) => document.getElementById(id);
-const btn = $("copy-button");
-const noFrame   = $("no-frame");
-const copyPanel = $("copy");
+const copyButton = $("copy-button");
+const statusLine = $("status");
+const pasteShortcut = navigator.userAgent.includes("Mac") ? "⌘V" : "Ctrl+V";
+const COPIED_MS = 3000;
+
+// Figma toasts follow the button: they change at the same moment and last as long.
+// A toast without a timeout stays until the next state replaces it.
+const TOASTS = {
+  idle: { message: null },
+  copying: { message: "Copying…" },
+  copied: { message: "Copied", timeout: COPIED_MS },
+  failed: { message: "Couldn't copy this selection", error: true, timeout: 4000 },
+};
+
+// Screen readers don't announce a button's label changing, so the status region does.
+const ANNOUNCEMENTS = {
+  idle: "",
+  copying: "Copying",
+  copied: `Copied. Paste using ${pasteShortcut}`,
+  failed: "Couldn't copy this selection",
+};
+
+let dataToCopy = null;
+let resetTimer = null;
 
 /** Measure actual content height and tell the plugin to resize. */
 function resize() {
@@ -16,8 +36,6 @@ function resize() {
   });
 }
 
-$("opts-details").addEventListener("toggle", resize);
-
 function getConfig() {
   return {
     stripVariables:   !$("opt-preserve-vars").checked,
@@ -26,7 +44,37 @@ function getConfig() {
   };
 }
 
-btn.addEventListener("click", () => {
+function hasSelection() {
+  return document.body.dataset.selection === "selected";
+}
+
+function isBusy() {
+  return copyButton.dataset.state === "copying" || copyButton.dataset.state === "copied";
+}
+
+function showSelection(selection) {
+  document.body.dataset.selection = selection ? "selected" : "empty";
+  $("selection-name").textContent = selection ? selection.name : "Nothing selected";
+  $("selection-detail").textContent = selection ? selection.detail : "Select a frame to copy";
+  // a new selection is a new copy, so the paste note or retry for the last one goes
+  if (copyButton.dataset.state !== "copying") showCopyState("idle");
+  resize();
+}
+
+// The button's face for each state is picked in CSS from data-state.
+function showCopyState(state) {
+  clearTimeout(resetTimer);
+  copyButton.dataset.state = state;
+  copyButton.disabled = !hasSelection() || isBusy();
+  statusLine.textContent = ANNOUNCEMENTS[state];
+  parent.postMessage({ pluginMessage: { type: "notify", ...TOASTS[state] } }, "*");
+  resize();
+  if (state === "copied") {
+    resetTimer = setTimeout(() => showCopyState("idle"), COPIED_MS);
+  }
+}
+
+copyButton.addEventListener("click", () => {
   parent.postMessage(
     { pluginMessage: { type: "copy-data", config: getConfig() } },
     "*",
@@ -34,31 +82,28 @@ btn.addEventListener("click", () => {
 });
 
 onmessage = (event) => {
-  const msg = event.data.pluginMessage;
+  const msg = event.data?.pluginMessage;
+  if (!msg) return;
   switch (msg.type) {
     case "no-selection":
-      noFrame.style.display = "flex";
-      copyPanel.style.display = "none";
-      resize();
+      showSelection(null);
       break;
     case "selection":
-      noFrame.style.display = "none";
-      copyPanel.style.display = "flex";
-      $("frame-name").textContent = msg.message;
-      resize();
+      showSelection(msg.message);
+      break;
+    case "copying":
+      showCopyState("copying");
       break;
     case "copy-to-clipboard":
       dataToCopy = msg.message;
-      document.execCommand("copy");
-      break;
-    case "copying":
-      btn.disabled = true;
-      btn.textContent = "Copying\u2026";
+      if (!document.execCommand("copy")) showCopyState("failed");
       break;
     case "copied":
-      btn.textContent = "Copied!";
-      parent.postMessage({ pluginMessage: { type: "notify", message: "Copied to clipboard!" } }, "*");
-      setTimeout(() => { btn.textContent = "Copy Frame"; btn.disabled = false; }, 2000);
+      if (copyButton.dataset.state === "failed") break;
+      showCopyState("copied");
+      break;
+    case "copy-failed":
+      showCopyState("failed");
       break;
   }
 };
@@ -77,5 +122,5 @@ document.addEventListener("copy", (event) => {
   event.preventDefault();
 });
 
-// Size the window to fit content immediately on load (before any plugin messages arrive).
-resize();
+$("paste-hint").textContent = `Paste using ${pasteShortcut}`;
+showCopyState("idle");
