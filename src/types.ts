@@ -14,7 +14,8 @@ export type MessageTypes =
   | { type: "copied" }
   | { type: "copy-data"; config?: Partial<PluginConfig> }
   | { type: "copy-to-clipboard"; message: Block[] }
-  | { type: "resize"; height: number };
+  | { type: "resize"; height: number }
+  | { type: "notify"; message: string };
 
 export type StyleRecord = Record<string, string | number>;
 

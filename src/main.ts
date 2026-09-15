@@ -10,6 +10,8 @@ figma.on("selectionchange", informSelection);
 figma.ui.onmessage = async (msg: MessageTypes) => {
   if (msg.type === "resize") {
     figma.ui.resize(240, msg.height);
+  } else if (msg.type === "notify") {
+    figma.notify(msg.message);
   } else if (msg.type === "copy-data") {
     if (msg.config) updateConfig(msg.config);
     await handleCopyData();
@@ -43,7 +45,6 @@ async function handleCopyData(): Promise<void> {
       message: result,
     } satisfies MessageTypes);
     figma.ui.postMessage({ type: "copied" } satisfies MessageTypes);
-    figma.notify("Copied to clipboard!");
   } catch (error) {
     figma.notify("Error copying data");
     console.error(error);

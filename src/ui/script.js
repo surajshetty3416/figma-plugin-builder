@@ -57,6 +57,7 @@ onmessage = (event) => {
       break;
     case "copied":
       btn.textContent = "Copied!";
+      parent.postMessage({ pluginMessage: { type: "notify", message: "Copied to clipboard!" } }, "*");
       setTimeout(() => { btn.textContent = "Copy Frame"; btn.disabled = false; }, 2000);
       break;
   }
