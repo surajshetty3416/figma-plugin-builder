@@ -70,7 +70,7 @@ function applyNodeSpecificStyles(
   }
 
   applyPositionStyles(node, parent, styles);
-  applyLayoutStyles(node, styles);
+  applyLayoutStyles(node, styles, parent);
   applyFillStyles(node, styles);
   applyStrokeStyles(node, styles);
 }
@@ -93,8 +93,14 @@ function applyPositionStyles(
   if (!parent || !isPositionedIn(node, parent)) return;
 
   styles.position = "absolute";
-  styles.left = `${roundPx(offsetWithin(node, parent, 0))}px`;
-  styles.top = `${roundPx(offsetWithin(node, parent, 1))}px`;
+  // a layer set to ignore auto layout already comes with the edges it is pinned
+  // to, and those follow the parent as it resizes — better than a fixed offset
+  if (!styles.left && !styles.right) {
+    styles.left = `${roundPx(offsetWithin(node, parent, 0))}px`;
+  }
+  if (!styles.top && !styles.bottom) {
+    styles.top = `${roundPx(offsetWithin(node, parent, 1))}px`;
+  }
 }
 
 function isPositionedIn(node: SceneNode, parent: BaseNode): boolean {
@@ -121,35 +127,92 @@ function roundPx(value: number): number {
 
 // ─── Layout ─────────────────────────────────────────────────────────────────
 
-function applyLayoutStyles(node: SceneNode, styles: StyleRecord): void {
+type Axis = "horizontal" | "vertical";
+
+function applyLayoutStyles(
+  node: SceneNode,
+  styles: StyleRecord,
+  parent?: SceneNode,
+): void {
   if (styles.width && shouldUsePercentage(node)) {
     styles.width = "100%";
   }
-  if (!("layoutMode" in node)) return;
+  applyAxisSize(node, styles, "horizontal", parent);
+  applyAxisSize(node, styles, "vertical", parent);
+}
 
-  const layoutMode = ["AUTO", "NONE"].includes(node.layoutMode ?? "AUTO")
-    ? "VERTICAL"
-    : node.layoutMode;
-  const isHorizontal = layoutMode === "HORIZONTAL";
+// Figma's Fill and Hug sizing come with no CSS of their own, so spell them out.
+// Without this a filling frame hugs its text in Builder and the layout collapses.
+function applyAxisSize(
+  node: SceneNode,
+  styles: StyleRecord,
+  axis: Axis,
+  parent?: SceneNode,
+): void {
+  const sizing = sizingOf(node, axis);
+  if (!sizing) return;
 
-  if (isHorizontal) {
-    if (node.counterAxisSizingMode === "FIXED")
-      styles.height = `${node.height}px`;
-    if (node.primaryAxisSizingMode === "FIXED") {
-      styles.width = shouldUsePercentage(node) ? "100%" : `${node.width}px`;
-    }
+  const property = axis === "horizontal" ? "width" : "height";
+  if (sizing === "HUG") {
+    delete styles[property];
+    // the copied layer is pasted without the frame it used to hug inside, and a
+    // section left to itself takes the full page width
+    if (!parent && axis === "horizontal") styles.width = "fit-content";
+  } else if (sizing === "FIXED") {
+    const size = axis === "horizontal" ? node.width : node.height;
+    styles[property] =
+      axis === "horizontal" && shouldUsePercentage(node)
+        ? "100%"
+        : `${roundPx(size)}px`;
   } else {
-    if (node.counterAxisSizingMode === "FIXED") {
-      styles.width = shouldUsePercentage(node) ? "100%" : `${node.width}px`;
-    }
-    if (node.primaryAxisSizingMode === "FIXED")
-      styles.height = `${node.height}px`;
+    fillParent(node, styles, axis);
   }
 }
 
+function fillParent(node: SceneNode, styles: StyleRecord, axis: Axis): void {
+  delete styles[axis === "horizontal" ? "width" : "height"];
+
+  if (!flowsAlong(node.parent, axis)) {
+    styles.alignSelf = "stretch";
+    return;
+  }
+  // taking the free space along the parent's own direction is what flex-grow does
+  styles.flexGrow = "1";
+  styles.flexBasis = "0";
+}
+
+function sizingOf(node: SceneNode, axis: Axis): "FIXED" | "HUG" | "FILL" | undefined {
+  if (usesAutoLayoutSizing(node)) {
+    return axis === "horizontal"
+      ? node.layoutSizingHorizontal
+      : node.layoutSizingVertical;
+  }
+  // a frame outside auto layout always keeps the size Figma gives it
+  return "layoutMode" in node ? "FIXED" : undefined;
+}
+
+// layoutSizing only means something for auto layout frames and their children
+function usesAutoLayoutSizing(node: SceneNode): node is SceneNode & LayoutMixin {
+  if (!("layoutSizingHorizontal" in node)) return false;
+  return isAutoLayout(node) || isAutoLayout(node.parent);
+}
+
+function isAutoLayout(node: BaseNode | null): boolean {
+  return !!node && "layoutMode" in node && node.layoutMode !== "NONE";
+}
+
+function flowsAlong(parent: BaseNode | null, axis: Axis): boolean {
+  if (!parent || !("layoutMode" in parent)) return false;
+  return parent.layoutMode === (axis === "horizontal" ? "HORIZONTAL" : "VERTICAL");
+}
+
 function shouldUsePercentage(node: SceneNode): boolean {
-  // @ts-expect-error: parent property exists at runtime
-  return node.width > 1000 || (node.parent && node.width === node.parent.width);
+  if (node.width > 1000) return true;
+
+  const parent = node.parent;
+  if (!parent || !("width" in parent) || node.width !== parent.width) return false;
+  // a parent that hugs takes its width from this node, so 100% would collapse both
+  return sizingOf(parent as SceneNode, "horizontal") !== "HUG";
 }
 
 // ─── Fills ───────────────────────────────────────────────────────────────────
