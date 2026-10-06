@@ -94,14 +94,13 @@ function findImageFill(node: SceneNode): ImagePaint | undefined {
   );
 }
 
-// Cropping in Figma keeps a slice of the source image, and the transform gives
-// that slice in the image's own 0–1 space — which is what object-view-box takes,
-// so the zoom and framing stay editable in Builder.
+// A crop keeps a slice of the source image, measured in the image's own 0–1
+// space — the same slice object-view-box takes.
 function applyCrop(fill: ImagePaint, styles: StyleRecord): void {
   if (fill.scaleMode !== "CROP" || !fill.imageTransform) return;
 
   const [[width, skewX, left], [skewY, height, top]] = fill.imageTransform;
-  // a rotated crop needs a transform, which object-view-box can't carry
+  // object-view-box can't carry a rotated crop
   if (skewX || skewY || !width || !height) return;
 
   const sides = [top, 1 - left - width, 1 - top - height, left];
@@ -113,9 +112,8 @@ function toPercent(fraction: number): string {
   return `${Math.round(Math.max(0, fraction) * 1000) / 10}%`;
 }
 
-// Figma's sliders run from -1 to 1, with 0 leaving the image alone. Saturation
-// lands exactly on CSS saturate(); brightness and contrast come close. Figma's
-// temperature, tint, highlights and shadows have no CSS filter to map onto.
+// Figma's sliders run from -1 to 1. Its temperature, tint, highlights and
+// shadows have no CSS filter to map onto.
 function applyImageFilters(fill: ImagePaint, styles: StyleRecord): void {
   const { saturation = 0, exposure = 0, contrast = 0 } = fill.filters ?? {};
   const filters: string[] = [];

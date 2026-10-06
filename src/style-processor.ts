@@ -93,8 +93,7 @@ function applyPositionStyles(
   if (!parent || !isPositionedIn(node, parent)) return;
 
   styles.position = "absolute";
-  // a layer set to ignore auto layout already comes with the edges it is pinned
-  // to, and those follow the parent as it resizes — better than a fixed offset
+  // Figma's own edges track the parent as it resizes; a computed offset doesn't
   if (!styles.left && !styles.right) {
     styles.left = `${roundPx(offsetWithin(node, parent, 0))}px`;
   }
@@ -141,8 +140,7 @@ function applyLayoutStyles(
   applyAxisSize(node, styles, "vertical", parent);
 }
 
-// Figma's Fill and Hug sizing come with no CSS of their own, so spell them out.
-// Without this a filling frame hugs its text in Builder and the layout collapses.
+// Fill and Hug sizing come with no CSS of their own, so spell them out.
 function applyAxisSize(
   node: SceneNode,
   styles: StyleRecord,
@@ -155,8 +153,8 @@ function applyAxisSize(
   const property = axis === "horizontal" ? "width" : "height";
   if (sizing === "HUG") {
     delete styles[property];
-    // the copied layer is pasted without the frame it used to hug inside, and a
-    // section left to itself takes the full page width
+    // the copied layer arrives without the frame it hugged inside, and a section
+    // left to itself takes the full page width
     if (!parent && axis === "horizontal") styles.width = "fit-content";
   } else if (sizing === "FIXED") {
     const size = axis === "horizontal" ? node.width : node.height;
@@ -176,7 +174,6 @@ function fillParent(node: SceneNode, styles: StyleRecord, axis: Axis): void {
     styles.alignSelf = "stretch";
     return;
   }
-  // taking the free space along the parent's own direction is what flex-grow does
   styles.flexGrow = "1";
   styles.flexBasis = "0";
 }
